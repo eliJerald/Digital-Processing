@@ -3,6 +3,7 @@ package com.example.licensedetection
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.os.Bundle
+import android.util.Log
 import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.EditText
@@ -30,9 +31,11 @@ class MainActivity : AppCompatActivity() {
 
         val py = Python.getInstance()
         val module = py.getModule("plot")
+        val download = py.getModule("download_dataset")
 
         findViewById<Button>(R.id.button).setOnClickListener {
             try {
+                download.callAttr("downloadDataset")
                 val bytes = module.callAttr("plot",
                     findViewById<EditText>(R.id.etX).text.toString(),
                     findViewById<EditText>(R.id.etY).text.toString())
