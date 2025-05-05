@@ -24,10 +24,11 @@ Photo by Gunnar Bjarki on Unsplash
 # kagglehub: a library that allows you to download datasets from Kaggle.
 import kagglehub
 
-# Download latest version
-path = kagglehub.dataset_download("andrewmvd/car-plate-detection")
-# windows path example:
-# C:\Users\<username>\.cache\kagglehub\datasets\andrewmvd\car-plate-detection\versions\1\images
-# C:\Users\<username>\.cache\kagglehub\datasets\andrewmvd\car-plate-detection\versions\1\annotations
+def downloadDataset():
+    # Download latest version
+    path = kagglehub.dataset_download("andrewmvd/car-plate-detection")
+    # windows path example:
+    # C:\Users\<username>\.cache\kagglehub\datasets\andrewmvd\car-plate-detection\versions\1\images
+    # C:\Users\<username>\.cache\kagglehub\datasets\andrewmvd\car-plate-detection\versions\1\annotations
 
-print("Path to dataset files:", path)
+    print("Path to dataset files:", path)
