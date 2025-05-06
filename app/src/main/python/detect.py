@@ -1,21 +1,21 @@
 """
-Eli Jerald C Rosales
-2025-05-02
+Eli Jerald C Rosales & Sarel Erasmus
+2025-05-06
 
-This script takes in an input picture and extracts the License Plate 
-number.
+This script takes in an input picture and preforms some preprocessing actions to then send to an Android OCR for License Plate Detection.
+These action include noise reduction, canny edge detection, and sobel edge detection.
 """
 
 import cv2
-import easyocr
 import numpy as np
 import matplotlib.pyplot as plt
+import os
+import json
 
 def detect_license_plate(image_path: str) -> str:
     """
     - Noise reduction
     - no zoom
-    - whole picture -> easyocr
     """
     plates = []
     # Load image
@@ -27,29 +27,18 @@ def detect_license_plate(image_path: str) -> str:
     # Optional: Apply some preprocessing
     gray = cv2.bilateralFilter(gray, 11, 17, 17)  # Noise reduction
 
-    # Use EasyOCR
-    reader = easyocr.Reader(['en'])
-    results = reader.readtext(gray)
+    output_path = "/sdcard/Download/filter_processed_" + os.path.basename(image_path)
+    cv2.imwrite(output_path, gray)
 
-    # Find the result that looks most like a license plate
-    for (bbox, text, prob) in results:
-        if len(text) >= 3:  # Adjust these thresholds
-            plates.append(text)
-    
-    # Return plates array
-    if len(plates) != 0:
-        return plates
-    else:
-        return "No License Plate Detected"
+    return output_path
 
 def canny_edge_zoomed_sharpened_detection ( image_path , low_threshold =50 ,
     high_threshold =130) :
     """
     - Noise reduced
     - zoomed in picture
-    - Relevant area only -> easyocr
     """
-    plates = []
+    possible_plates_paths = []
 
     # Read image in grayscale
     image = cv2.imread(image_path)
@@ -70,6 +59,10 @@ def canny_edge_zoomed_sharpened_detection ( image_path , low_threshold =50 ,
     '''
     # Find contours in the edge-detected image
     contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+
+    count = 1
+
+    os.makedirs("/sdcard/Download/canny_processed/", exist_ok=True)
 
     # Loop through contours and filter by aspect ratio
     for contour in contours:
@@ -109,18 +102,14 @@ def canny_edge_zoomed_sharpened_detection ( image_path , low_threshold =50 ,
                 plt.imshow ( sharpened_image , cmap ='gray')
                 plt.show()
                 """
-                # Use EasyOCR to detect characters
-                reader = easyocr.Reader(['en'])
-                results = reader.readtext(sharpened_image)
 
-                # Find the result that looks most like a license plate
-                for (bbox, text, prob) in results:
-                    if len(text) >= 3:  # Adjust these thresholds
-                        plates.append(text)
-    if len(plates) != 0:
-        return plates
-    else:
-        return "No License Plate Detected"
+                output_path = f"/sdcard/Download/canny_processed/{count}_{os.path.basename(image_path)}"
+                cv2.imwrite(output_path, sharpened_image)
+                count += 1
+
+                possible_plates_paths.append(output_path)
+
+    return possible_plates_paths
 
 def sobel_edge_detection ( image_path ) :
     """"""
@@ -139,46 +128,37 @@ def sobel_edge_detection ( image_path ) :
     magnitude = np.sqrt ( sobel_x **2 + sobel_y **2) 
     # Gradient magnitude
 
-    magnitude = cv2.convertScaleAbs ( magnitude ) 
+    magnitude = cv2.convertScaleAbs ( magnitude )
 
-    # Visualize results for testing purposes
-    '''
-    plt.figure ( figsize =(8 , 4) )
-    plt.subplot (1 , 2 , 1) , plt.imshow ( image , cmap ='gray') , plt.title ('Original')
-    plt.subplot (1 , 2 , 2) , plt.imshow ( magnitude , cmap ='gray') , plt.title ('Sobel_Edges')
-    plt.tight_layout ()
-    plt.show()
-    #plt.savefig ('sobel_output.png')
-    plt.close ()
-    '''
+    output_path = "/sdcard/Download/sobel_processed_" + os.path.basename(image_path)
+    cv2.imwrite(output_path, magnitude)
 
-    # Use EasyOCR
-    reader = easyocr.Reader(['en'])
-    results = reader.readtext(magnitude)
+    return output_path
 
-    # Find the result that looks most like a license plate
-    for (bbox, text, prob) in results:
-        if len(text) >= 5 and prob > 0.4:  # Adjust these thresholds
-            plates.append(text)
+# Each function returns paths of the preprocessed images which will be passed to ML Kit in DashboardFragment
+def main(image_path):
 
-    # Return plates array or nothing
-    if len(plates) != 0:
-        return plates
-    else:
-        return "No License Plate Detected: Sobel_edge"
+    filter_path = detect_license_plate(image_path)
 
-def main():
-    # Example usage
-    image_path = "C:\\Users\\ejera\\.cache\\kagglehub\\datasets\\andrewmvd\\car-plate-detection\\versions\\1\\images\\Cars40.png"
+    canny_plates_paths = canny_edge_zoomed_sharpened_detection(image_path)
 
-    plate_text = detect_license_plate(image_path)
-    print("Detected License Plate:", plate_text)
+    sobel_path = sobel_edge_detection(image_path)
 
-    edges = canny_edge_zoomed_sharpened_detection(image_path)
-    print("Detected License Plate - Canny edge + Zoom:", edges)
+    def to_list(val):
+        if isinstance(val, list):
+            return val
+        elif isinstance(val, str):
+            return [val]
+        else:
+            return [str(val)]
 
-    mags = sobel_edge_detection(image_path)
-    print("Detected License Plate - Sobel edge:", mags)
+    result = [
+        to_list(filter_path),
+        to_list(canny_plates_paths),
+        to_list(sobel_path)
+    ]
+
+    return result
 
 if __name__ == "__main__":
     main()

@@ -4,9 +4,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.TextView
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.ViewModelProvider
 import com.example.licensedetection.databinding.FragmentNotificationsBinding
 
 class NotificationsFragment : Fragment() {
@@ -22,16 +20,19 @@ class NotificationsFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        val notificationsViewModel =
-            ViewModelProvider(this).get(NotificationsViewModel::class.java)
-
         _binding = FragmentNotificationsBinding.inflate(inflater, container, false)
         val root: View = binding.root
 
-        val textView: TextView = binding.textNotifications
-        notificationsViewModel.text.observe(viewLifecycleOwner) {
-            textView.text = it
-        }
+        // Grab the text that was generated in the detect Fragment
+        val filterText = arguments?.getString("EXTRA_RECOGNIZED_TEXT_FILTER") ?: "Found No License Plates"
+        val cannyText = arguments?.getString("EXTRA_RECOGNIZED_TEXT_CANNY") ?: "Found No License Plates"
+        val sobelText = arguments?.getString("EXTRA_RECOGNIZED_TEXT_SOBEL") ?: "Found No License Plates"
+
+        // Display them in TextViews
+        binding.noisePlateText.text = filterText
+        binding.cannyPlateText.text = cannyText
+        binding.sobelPlateText.text = sobelText
+
         return root
     }
 
