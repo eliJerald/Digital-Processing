@@ -9,6 +9,8 @@ import androidx.navigation.ui.setupActionBarWithNavController
 import androidx.navigation.ui.setupWithNavController
 import com.chaquo.python.Python
 import com.example.licensedetection.databinding.ActivityMainBinding
+import java.io.File
+import java.io.FileOutputStream
 
 class MainActivity : AppCompatActivity() {
 
@@ -19,12 +21,6 @@ class MainActivity : AppCompatActivity() {
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
-        val py = Python.getInstance()
-        val module = py.getModule("plot")
-        val download = py.getModule("download_dataset")
-
-
 
         val navView: BottomNavigationView = binding.navView
 
