@@ -12,7 +12,9 @@ import android.widget.Button
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
+import androidx.navigation.findNavController
 import com.chaquo.python.Python
+import com.example.licensedetection.R
 import com.example.licensedetection.databinding.FragmentDashboardBinding
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
@@ -39,6 +41,11 @@ class DashboardFragment : Fragment() {
 
     private var currentImageURI: String? = null
 
+    // Holds The Results of Each Function
+    private val filterResults = mutableListOf<String>()
+    private val cannyResults = mutableListOf<String>()
+    private val sobelResults = mutableListOf<String>()
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -51,7 +58,7 @@ class DashboardFragment : Fragment() {
         val py = Python.getInstance()
         val detect = py.getModule("detect")
 
-        // Intialize all the Components in the View
+        // Initialize all the Components in the View
         imageView = binding.imageView
         chooseimageButton = binding.buttonChooseImage
 
@@ -63,6 +70,7 @@ class DashboardFragment : Fragment() {
             uri?.let {
                 imageView!!.setImageURI(it)
 
+                // Create a Temporary File so that the python script has a file path to run
                 val inputStream = requireContext().contentResolver.openInputStream(it)
                 val tempFile = File.createTempFile("input_image", ".jpg", requireContext().cacheDir)
                 inputStream?.use { input ->
@@ -71,6 +79,7 @@ class DashboardFragment : Fragment() {
 
                 currentImageURI = tempFile.absolutePath
 
+                // Change which buttons are visible to allow user to run the script
                 chooseimageButton!!.visibility = View.INVISIBLE
 
                 changeimageButton!!.visibility = View.VISIBLE
@@ -97,33 +106,77 @@ class DashboardFragment : Fragment() {
             val filterPlates = jsonArray.getJSONArray(0).let { array ->
                 List(array.length()) { i -> array.getString(i) }
             }
-            filterPlates.forEach { path ->
-                runMLKitOCR(path)
-            }
 
             val cannyPlates = jsonArray.getJSONArray(1).let { array ->
                 List(array.length()) { i -> array.getString(i) }
-            }
-            cannyPlates.forEach { path ->
-                runMLKitOCR(path)
             }
 
             val sobelPlates = jsonArray.getJSONArray(2).let { array ->
                 List(array.length()) { i -> array.getString(i) }
             }
-            sobelPlates.forEach { path ->
-                runMLKitOCR(path)
+
+            var completed = 0
+            val total = filterPlates.size + cannyPlates.size + sobelPlates.size
+
+            // Clear previous OCR results
+            filterResults.clear()
+            cannyResults.clear()
+            sobelResults.clear()
+
+            // Function to process each set and then navigate when all are done
+            val processSet: (List<String>, String) -> Unit = { paths, key ->
+                paths.forEach { path ->
+                    runMLKitOCR(path,key) {
+
+                        completed += 1
+                        if (completed == total) {
+                            // When all sets are processed, navigate
+
+                            // Have a default message if any of the functions don't find a license plate
+                            if(filterResults.size == 0)
+                                filterResults.add(0,"Detected No License Plate")
+
+                            if(cannyResults.size == 0)
+                                cannyResults.add(0,"Detected No License Plate")
+
+                            if(sobelResults.size == 0)
+                                sobelResults.add(0,"Detected No License Plate")
+
+                            // Bundle for all plates
+                            val bundle = Bundle().apply {
+                                putString("EXTRA_RECOGNIZED_TEXT_FILTER", filterResults.distinct().joinToString("\n"))
+                                putString("EXTRA_RECOGNIZED_TEXT_CANNY", cannyResults.distinct().joinToString("\n"))
+                                putString("EXTRA_RECOGNIZED_TEXT_SOBEL", sobelResults.distinct().joinToString("\n"))
+                            }
+
+                            // Navigate to the notification fragment to display results
+                            binding.root.findNavController().navigate(
+                                R.id.action_dashboardFragment_to_notificationFragment,
+                                bundle
+                            )
+
+                        }
+                    }
+                }
             }
+
+            // Process all image paths for each function
+            processSet(filterPlates, "filterPlates")
+            processSet(cannyPlates, "cannyPlates")
+            processSet(sobelPlates, "sobelPlates")
         }
+
 
         return root
     }
 
     // Run an OCR on the given path
-    private fun runMLKitOCR(imagePath: String) {
+    private fun runMLKitOCR(imagePath: String, key: String, onComplete: () -> Unit) {
+        // Open the preprocessed image for OCR processing
         val imageFile = File(imagePath)
         if (!imageFile.exists()) {
             Log.e("MLKitOCR", "Image file not found: $imagePath")
+            onComplete()
             return
         }
 
@@ -134,6 +187,7 @@ class DashboardFragment : Fragment() {
 
         val recognizer: TextRecognizer = TextRecognition.getClient(options)
 
+        // Run OCR on the image
         recognizer.process(image)
             .addOnSuccessListener { visionText ->
                 // List of State Names to be ignored on license plate detection
@@ -160,11 +214,21 @@ class DashboardFragment : Fragment() {
 
                 Log.d("FilteredOCR", "Filtered results: $filteredText")
 
-                // Optional: update UI with result
-                // view?.findViewById<TextView>(R.id.textResult)?.text = resultText
+                // Save the results to an object dependant on which function was being tested
+                if(key == "filterPlates") {
+                    filterResults.addAll(filteredText)
+                }else if(key == "cannyPlates") {
+                    cannyResults.addAll(filteredText)
+                }
+                else {
+                    sobelResults.addAll(filteredText)
+                }
             }
             .addOnFailureListener { e ->
                 Log.e("MLKitOCR", "OCR failed for $imagePath", e)
+            }
+            .addOnCompleteListener {
+                onComplete()
             }
     }
 
